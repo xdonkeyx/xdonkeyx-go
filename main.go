@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"xdonkeyx.com/sample/rabbit"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,9 +15,25 @@ type LocationUpdatedEvent struct {
 	Longitude float32 `json:"longitude"`
 }
 
+type AppContext struct {
+	RabbitConfig *rabbit.RabbitConfig
+}
+
+func (e LocationUpdatedEvent) String() string {
+	return fmt.Sprintf("driverId: %b", e.DriverId)
+}
+
+var appContext = AppContext{}
+
 func main() {
 	fmt.Println("Hello world")
 
+	// rabbitMQ
+	appContext.RabbitConfig = rabbit.StartRabbit()
+
+	fmt.Println(appContext.RabbitConfig)
+
+	// http server
 	router := gin.Default()
 	router.POST("/location", postLocation)
 	router.Run("localhost:9090")
@@ -32,7 +50,9 @@ func postLocation(context *gin.Context) {
 		return
 	}
 
-	fmt.Println(event)
+	fmt.Println("received event : " + event.String())
+
+	rabbit.SendMessage(appContext.RabbitConfig, event.String())
 
 	context.IndentedJSON(http.StatusCreated, event)
 }
